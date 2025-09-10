@@ -18,7 +18,7 @@ type PageQueryParamSchema = z.infer<typeof pageQueryParamSchema>
 
 @Controller('/questions')
 @UseGuards(JwtAuthGuard)
-export class FetchPrivateQuestionsController {
+export class FetchRecentQuestionsController {
   constructor(private fetchRecentQuestions: FetchRecentQuestionsUseCase) {}
 
   @Get()
