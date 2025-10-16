@@ -1,21 +1,22 @@
 import { config } from 'dotenv'
 
 import { PrismaClient } from '@prisma/client'
-import { execSync } from 'child_process'
-import { randomUUID } from 'crypto'
-import 'dotenv/config'
+import { randomUUID } from 'node:crypto'
+import { execSync } from 'node:child_process'
+import { DomainEvents } from '@/core/events/domain-events'
 
 config({ path: '.env', override: true })
 config({ path: '.env.test', override: true })
 
-let prisma: PrismaClient
+const prisma = new PrismaClient()
 
 function generateUniqueDatabaseURL(schemaId: string) {
   if (!process.env.DATABASE_URL) {
-    throw new Error('Please provide a DATABASE_URL environment variable')
+    throw new Error('Please provider a DATABASE_URL environment variable')
   }
 
   const url = new URL(process.env.DATABASE_URL)
+
   url.searchParams.set('schema', schemaId)
 
   return url.toString()
@@ -28,40 +29,12 @@ beforeAll(async () => {
 
   process.env.DATABASE_URL = databaseURL
 
-  const tempPrisma = new PrismaClient({
-    datasources: { db: { url: databaseURL } },
-  })
+  DomainEvents.shouldRun = false
 
-  try {
-    await tempPrisma.$executeRawUnsafe(
-      `DROP SCHEMA IF EXISTS "${schemaId}" CASCADE`,
-    )
-    await tempPrisma.$executeRawUnsafe(`CREATE SCHEMA "${schemaId}"`)
-  } catch (error) {
-    console.log('Schema cleanup error (ignorado):', error)
-  } finally {
-    await tempPrisma.$disconnect()
-  }
-
-  execSync('npx prisma db push', {
-    stdio: 'inherit',
-    env: { ...process.env, DATABASE_URL: databaseURL },
-  })
-
-  prisma = new PrismaClient({
-    datasources: {
-      db: {
-        url: databaseURL,
-      },
-    },
-  })
+  execSync('pnpm prisma migrate deploy')
 })
 
 afterAll(async () => {
-  if (prisma) {
-    await prisma.$executeRawUnsafe(
-      `DROP SCHEMA IF EXISTS "${schemaId}" CASCADE`,
-    )
-    await prisma.$disconnect()
-  }
+  await prisma.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schemaId}" CASCADE`)
+  await prisma.$disconnect()
 })
